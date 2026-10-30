@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+@theme {
+	--color-brand: #235a81;
+	--color-brand-dark: #1a4562;
+	--color-brand-light: #e8f1f8;
+	/* Primary button fill: the same in both themes, with white text */
+	--color-brand-fill: #235a81;
+	--color-brand-fill-dark: #1a4562;
+	--color-on-brand: #fff;
+	--font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+/*
+ * Dark mode: src/theme.js sets <html data-theme="dark"> (from the saved choice or the system setting).
+ * Components use plain Tailwind colors, so dark mode swaps the values of the shades in use: white and
+ * light neutrals become dark surfaces, dark neutrals become light text, and the tinted status colours
+ * (red / green / amber / sky / purple) flip to dark backgrounds with light text.
+ */
+:root {
+	color-scheme: light;
+}
+:root[data-theme="dark"] {
+	color-scheme: dark;
+
+	--color-white: #18181a;
+	--color-neutral-50: #1f1f22;
+	--color-neutral-100: #26262a;
+	--color-neutral-200: #303035;
+	--color-neutral-300: #3d3d43;
+	--color-neutral-400: #6b6b73;
+	--color-neutral-500: #9a9aa2;
+	--color-neutral-600: #b4b4bb;
+	--color-neutral-700: #cfcfd5;
+	--color-neutral-800: #e2e2e6;
+	--color-neutral-900: #f0f0f2;
+
+	--color-brand: #6aa8d8;
+	--color-brand-dark: #9ccaee;
+	--color-brand-light: #1e3a52;
+
+	--color-red-50: #2a1214;
+	--color-red-100: #3b1519;
+	--color-red-300: #7a2a2e;
+	--color-red-400: #a63a3f;
+	--color-red-700: #f08a8a;
+	--color-red-800: #f5a3a3;
+
+	--color-green-50: #102318;
+	--color-green-300: #23573a;
+	--color-green-800: #8ee0ad;
+	--color-green-900: #b5efc9;
+
+	--color-amber-50: #2a2010;
+	--color-amber-100: #3a2c0e;
+	--color-amber-300: #6e5216;
+	--color-amber-800: #f2c96b;
+	--color-amber-900: #f7dc95;
+
+	--color-sky-100: #13324a;
+	--color-sky-800: #8fd0f5;
+
+	--color-purple-500: #b48cf0;
+	--color-purple-700: #c9a8f7;
+}
+
+@layer base {
+	body {
+		@apply text-sm text-neutral-800 antialiased;
+	}
+}
+
+@layer components {
+	.btn {
+		@apply inline-flex cursor-pointer items-center gap-1.5 rounded border border-neutral-300 bg-linear-to-b from-white to-neutral-100 px-3 py-1.5 text-sm whitespace-nowrap text-neutral-800 shadow-xs hover:border-neutral-400 hover:to-neutral-200 disabled:cursor-not-allowed disabled:opacity-50;
+	}
+	.btn-sm {
+		@apply px-2 py-0.5 text-xs;
+	}
+	.btn-primary {
+		@apply border-brand-fill-dark from-brand-fill to-brand-fill-dark text-on-brand hover:border-brand-fill-dark hover:to-brand-fill-dark;
+	}
+	.btn-danger {
+		@apply border-red-300 text-red-700 hover:border-red-400 hover:to-red-100;
+	}
+	.input {
+		@apply rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm shadow-inner focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none disabled:bg-neutral-100;
+	}
+	.link {
+		@apply cursor-pointer text-brand hover:text-brand-dark hover:underline;
+	}
+	.panel {
+		@apply rounded-md border border-neutral-300 bg-neutral-50;
+	}
+	.panel-title {
+		@apply border-b border-neutral-300 bg-linear-to-b from-white to-neutral-100 px-3 py-1.5 text-xs font-semibold tracking-wide text-neutral-600 uppercase;
+	}
+
+	/* phpMyAdmin-style data tables */
+	.data-table {
+		@apply border-separate border-spacing-0 text-sm;
+	}
+	.data-table th {
+		@apply sticky top-0 z-10 border-r border-b border-neutral-300 bg-linear-to-b from-white to-neutral-200 px-3 py-1.5 text-left font-semibold whitespace-nowrap text-neutral-700 first:border-l;
+	}
+	.data-table td {
+		@apply border-r border-b border-neutral-200 px-3 py-1.5 align-top first:border-l;
+	}
+	.data-table thead tr:first-child th {
+		@apply border-t;
+	}
+	.data-table tbody tr:nth-child(even) td {
+		@apply bg-neutral-50;
+	}
+	.data-table tbody tr:hover td {
+		@apply bg-brand-light;
+	}
+	.data-table tbody tr.selected td {
+		@apply bg-amber-100;
+	}
+
+	/* IDE-style grid inside a framed view (browse tab): small monospace text, no outer border */
+	.data-table.compact th {
+		@apply px-4 py-2.5 text-xs first:border-l-0;
+	}
+	.data-table.compact thead tr:first-child th {
+		@apply border-t-0;
+	}
+	.data-table.compact td {
+		@apply px-4 py-2 font-mono text-xs first:border-l-0;
+	}
+	.data-table.compact td.editing {
+		@apply bg-white outline-2 -outline-offset-2 outline-brand;
+	}
+	/* Unapplied changes: edited cells and rows marked for deletion */
+	.data-table.compact td.changed {
+		@apply bg-sky-100;
+	}
+	.data-table.compact tr.deleted td {
+		@apply bg-red-50 text-neutral-400;
+	}
+	.data-table.compact tr.deleted td > span {
+		@apply line-through;
+	}
+}
