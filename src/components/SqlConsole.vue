@@ -60,6 +60,7 @@ function generate(template) {
 const tabs = computed(() => props.db ? [
 	{ id: 'tables', label: 'Tables', href: link({ db: props.db }) },
 	{ id: 'sql', label: 'SQL', href: link({ db: props.db, tab: 'sql' }) },
+	{ id: 'create', label: 'Create table', href: link({ db: props.db, tab: 'create' }) },
 ] : []);
 
 function remember(text) {

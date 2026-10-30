@@ -2,12 +2,15 @@
 import { displayName } from '../format.js';
 import { link } from '../router.js';
 
-defineProps({ target: Object, structure: Object });
+defineProps({ target: Object, structure: Object, isView: Boolean });
 </script>
 
 <template>
 	<section class="mb-6">
-		<h2 class="mb-2 font-semibold text-neutral-700">Columns</h2>
+		<div class="mb-2 flex items-center gap-3">
+			<h2 class="font-semibold text-neutral-700">Columns</h2>
+			<a v-if="!isView" :href="link({ ...target, tab: 'alter' })" class="btn btn-sm hover:no-underline">Edit structure</a>
+		</div>
 		<div class="overflow-x-auto">
 			<table class="data-table">
 				<thead>

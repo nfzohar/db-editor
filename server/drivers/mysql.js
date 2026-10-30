@@ -4,6 +4,18 @@ import { BaseDriver, groupColumns, groupForeignKeys, groupIndexes, normalizeRows
 
 const SYSTEM_DATABASES = new Set(['information_schema', 'performance_schema', 'mysql', 'sys']);
 
+/**
+ * COLUMN_DEFAULT as SQL, the way PostgreSQL and SQLite report defaults. MySQL lists literals unquoted
+ * and expressions without their parentheses; MariaDB already reports SQL (and the text NULL for none).
+ */
+export function defaultSql(value, extra, mariadb) {
+	if (value === null || value === undefined) return null;
+	if (mariadb) return value === 'NULL' ? null : value;
+	if (/^current_timestamp(\(\d*\))?$/i.test(value) || /^-?\d+(\.\d+)?$/.test(value) || /^b'[01]*'$/.test(value)) return value;
+	if (/\bDEFAULT_GENERATED\b/i.test(extra)) return `(${value})`;
+	return "'" + value.replaceAll('\\', '\\\\').replaceAll("'", "''") + "'";
+}
+
 export class MysqlDriver extends BaseDriver {
 	static async connect({ host, port, user, password, database, ssl }) {
 		const pool = mysql.createPool({
@@ -85,7 +97,7 @@ export class MysqlDriver extends BaseDriver {
 	async describeTable(db, table) {
 		const columns = await this.rows(
 			`SELECT COLUMN_NAME AS name, COLUMN_TYPE AS column_type, IS_NULLABLE AS is_nullable, COLUMN_DEFAULT AS default_value,
-				COLUMN_KEY AS column_key, EXTRA AS extra, COLUMN_COMMENT AS comment
+				COLUMN_KEY AS column_key, EXTRA AS extra, COLUMN_COMMENT AS comment, COLLATION_NAME AS collation_name
 			FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`, [db, table]);
 		const indexes = await this.rows(
 			`SELECT INDEX_NAME AS name, COLUMN_NAME AS col, NON_UNIQUE AS non_unique
@@ -106,10 +118,14 @@ export class MysqlDriver extends BaseDriver {
 				type: c.column_type,
 				enumValues: parseEnumValues(c.column_type),
 				nullable: c.is_nullable === 'YES',
-				default: c.default_value,
+				default: defaultSql(c.default_value, c.extra, /mariadb/i.test(this.version)),
 				primaryKey: c.column_key === 'PRI',
 				autoIncrement: /auto_increment/i.test(c.extra),
 				comment: c.comment,
+				// Kept so the structure form can rewrite a column definition without losing them.
+				onUpdate: /\bon update (\S+)/i.exec(c.extra)?.[1] ?? null,
+				collation: c.collation_name,
+				generated: /\b(VIRTUAL|STORED) GENERATED\b/i.test(c.extra),
 			})),
 			indexes: groupIndexes(indexes.map((i) => ({ name: i.name, column: i.col, unique: !Number(i.non_unique), primary: i.name === 'PRIMARY' }))),
 			foreignKeys: groupForeignKeys(foreignKeys.map((f) => ({

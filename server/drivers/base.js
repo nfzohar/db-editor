@@ -51,12 +51,18 @@ export class BaseDriver {
 		return { ...(await this.exec(db, sql, params)), sql };
 	}
 
-	/** Run a user script statement by statement, stopping at the first error. */
-	async runSql(db, script) {
+	/**
+	 * Run a user script statement by statement, stopping at the first error. With `transaction`, the
+	 * script is all or nothing where the database can roll back schema changes (not MySQL).
+	 */
+	async runSql(db, script, { transaction = false } = {}) {
 		const statements = splitSql(String(script ?? ''), this.dialectName);
 		if (!statements.length) throw new UserError('Enter an SQL statement.');
+		const atomic = transaction && this.dialect.transactionalDdl;
 		const results = [];
 		await this.withConnection(db, async (conn) => {
+			if (atomic) await this.runStatement(db, 'BEGIN', conn);
+			let failed = false;
 			for (const sql of statements) {
 				const started = performance.now();
 				try {
@@ -64,8 +70,17 @@ export class BaseDriver {
 					results.push({ sql, ...result, time: performance.now() - started });
 				} catch (error) {
 					results.push({ sql, error: error.message, time: performance.now() - started });
+					failed = true;
 					break;
 				}
+			}
+			if (!atomic) return;
+			if (failed) return this.runStatement(db, 'ROLLBACK', conn);
+			try {
+				await this.runStatement(db, 'COMMIT', conn);
+			} catch (error) {
+				await this.runStatement(db, 'ROLLBACK', conn).catch(() => {});
+				throw error;
 			}
 		});
 		return results;

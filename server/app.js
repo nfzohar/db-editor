@@ -108,7 +108,9 @@ export function createApp({ html = null, allowSqlite = true } = {}) {
 			schema: body.schema || null, key: plainObject(body.key),
 		}),
 
-		'POST /api/sql': async (req, res, body) => ({ results: await getSession(req).driver.runSql(body.db || null, body.sql) }),
+		'POST /api/sql': async (req, res, body) => ({
+			results: await getSession(req).driver.runSql(body.db || null, body.sql, { transaction: body.transaction === true }),
+		}),
 	};
 
 	async function sessionInfo(session) {

@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { createApp } from '../server/app.js';
+import { alterTableSql, createTableSql, formColumn, joinStatements, newColumn } from '../src/ddl.js';
 
 let dir, file, server, app, base;
 
@@ -194,6 +195,47 @@ describe('editing', () => {
 		const { status, data } = await call('/api/rows/update', { method: 'POST', body: { db: 'main', table: 'customers', key: { id: 999 }, values: { name: 'x' } } });
 		assert.equal(status, 400);
 		assert.match(data.error, /No row was updated/);
+	});
+});
+
+describe('structure form', () => {
+	const run = async (statements) => (await call('/api/sql', { method: 'POST', body: { db: 'main', sql: joinStatements(statements), transaction: true } })).data.results;
+	const structureOf = async (table) => (await call(`/api/structure?db=main&table=${table}`)).data;
+
+	test('creates a table from the form', async () => {
+		const columns = [
+			{ ...newColumn(), name: 'id', type: 'INTEGER', nullable: false, primaryKey: true },
+			{ ...newColumn(), name: 'title', type: 'TEXT', nullable: false, default: "'untitled'" },
+		];
+		const results = await run(createTableSql('sqlite', { table: 'notes', columns }));
+		assert.ok(results.every((r) => !r.error), JSON.stringify(results));
+		const { columns: created } = await structureOf('notes');
+		assert.deepEqual(created.map((c) => [c.name, c.type, c.nullable, c.default, c.primaryKey, c.autoIncrement]), [
+			['id', 'INTEGER', false, null, true, true],
+			['title', 'TEXT', false, "'untitled'", false, false],
+		]);
+	});
+
+	test('renames, adds and drops columns, then renames the table', async () => {
+		const columns = (await structureOf('notes')).columns.map(formColumn);
+		columns[1].name = 'heading';
+		columns.push({ ...newColumn(), name: 'body', type: 'TEXT' });
+		await run(alterTableSql('sqlite', { table: 'notes', columns }));
+		assert.deepEqual((await structureOf('notes')).columns.map((c) => c.name), ['id', 'heading', 'body']);
+
+		const next = (await structureOf('notes')).columns.map(formColumn);
+		next[2].dropped = true;
+		const results = await run(alterTableSql('sqlite', { table: 'notes', name: 'memos', columns: next }));
+		assert.ok(results.every((r) => !r.error), JSON.stringify(results));
+		assert.deepEqual((await structureOf('memos')).columns.map((c) => c.name), ['id', 'heading']);
+	});
+
+	test('a failing change is rolled back as a whole', async () => {
+		const results = await run(['ALTER TABLE "memos" ADD COLUMN "extra" TEXT', 'ALTER TABLE "memos" RENAME COLUMN "nope" TO "x"']);
+		assert.match(results.at(-1).error, /nope/);
+		assert.deepEqual((await structureOf('memos')).columns.map((c) => c.name), ['id', 'heading']);
+		// The connection is usable again afterwards, outside any transaction.
+		assert.equal((await run(['DROP TABLE "memos"']))[0].error, undefined);
 	});
 });
 

@@ -5,9 +5,11 @@ It supports **MySQL/MariaDB**, **PostgreSQL** and **SQLite**, and builds to a si
 
 - Browse tables PhpStorm-style: type SQL into the `WHERE` and `ORDER BY` bar above the grid, or click a header to sort
 - Edit cells inline with editors that fit the column type (dropdowns for boolean/enum, date and time pickers, checks for numbers, JSON, UUIDs and length) and mark rows for deletion, then Apply or Revert the changes together (tables with a primary key); the table SQL tab generates SELECT / INSERT / UPDATE / DELETE templates
-- Inspect columns, indexes and foreign keys
+- Inspect columns, indexes and foreign keys; create tables and edit their columns with a form that shows the SQL
+  before it runs
 - Run SQL scripts, with per-statement results and a query history
-- phpMyAdmin-style layout: database tree on the left, breadcrumb bar, Browse / Structure / SQL tabs
+- phpMyAdmin-style layout: database tree on the left, breadcrumb bar, Tables / SQL / Create table tabs on a
+  database and Browse / Structure / SQL tabs on a table
 - Light and dark themes: follows the system setting, or pick one with the theme button in the top bar
 - The login page lists previous connections (kept in the browser, without passwords) to fill the form in one click
 
@@ -26,19 +28,58 @@ yarn start             # same as: node dist/dbeditor.mjs  -> http://127.0.0.1:80
 ```
 
 `dist/dbeditor.mjs` contains the UI, the server and the MySQL/PostgreSQL drivers, so you can copy that one
-file anywhere with Node 22+ and run it. Options:
+file anywhere with Node 22.13+ and run it. Options:
 
 ```
 --host 127.0.0.1   address to listen on (default: this machine only)
 --port 8080        port to listen on
 --allow-sqlite     allow SQLite when listening on a non-local address
+-h, --help         show these options
 ```
+
+## Using the UI
+
+1. **Log in.** Pick the system (MySQL/MariaDB, PostgreSQL or SQLite). For MySQL and PostgreSQL, enter the
+   server, port, username and password; the database is optional (PostgreSQL defaults to `postgres`). For
+   SQLite, enter the path to the database file on the machine running the server. Earlier connections are
+   listed under the form: click one to fill it in again (you still type the password).
+2. **Find a table.** The left sidebar lists the databases; expand one to see its tables and their columns.
+   The filter box above it matches table and column names. ↻ reloads the list after you change the schema.
+   Clicking a database opens its table list with row counts and links to each table.
+3. **Browse and edit rows** (Browse tab):
+   - Type a condition into `WHERE` or `ORDER BY` above the grid and press Enter. Clicking a column header
+     cycles ascending → descending → unsorted.
+   - Click a cell to edit it. Enter keeps the value, Tab / Shift+Tab move to the next / previous cell,
+     Esc cancels, and the NULL button sets the value to NULL.
+   - Tick rows and press **Delete selected** to mark them for deletion.
+   - Changes are only pending (highlighted) until you press **Apply**; **Revert** discards them. Rows are
+     written one at a time, so if one fails, the ones before it are saved and the rest stay pending.
+   - Tables without a primary key are read-only here; change them from the SQL tab.
+4. **Structure tab:** columns, indexes and foreign keys of the table. On tables (not views), **Edit structure**
+   opens a form to rename the table and rename, add, remove or change columns (type, NULL, default, primary
+   key, auto increment, comment). Remove marks a column to be dropped; Restore takes that back.
+   - The SQL it will run is shown below the form and updates as you type. Nothing changes until you press
+     **Save changes**, and dropping columns asks for confirmation first.
+   - Types and defaults are written as SQL: `varchar(255)`, `'text'`, `0`, `CURRENT_TIMESTAMP`. Leave the
+     default empty for none.
+   - On PostgreSQL and SQLite the changes are applied together or not at all. On MySQL they are one
+     `ALTER TABLE` statement.
+   - SQLite can only rename, add and drop the columns of an existing table, so the other fields are disabled
+     there; make those changes from the SQL tab.
+5. **Create a table** from the **Create table** tab of a database: the same form, starting with an `id`
+   primary key column. On PostgreSQL, set the schema next to the table name (default `public`).
+6. **SQL tab:** run one or more statements separated by `;` with **Go** or Ctrl+Enter. Each statement gets
+   its own result. On a table, the Generate buttons write a SELECT / INSERT / UPDATE / DELETE to start from.
+   Recent queries are listed under History (kept in this browser); click one to load it.
+
+The theme button in the top bar switches between system, light and dark. **Log out** ends the session;
+sessions also end after 60 minutes idle.
 
 ## Develop
 
 ```sh
 yarn dev      # Vite dev server with hot reload on http://127.0.0.1:5173/; the API runs inside it
-yarn test     # server tests (SQL generation for all dialects + HTTP API against SQLite)
+yarn test     # SQL generation for all dialects (queries, structure form, templates) + HTTP API against SQLite
 ```
 
 ## Layout
@@ -50,12 +91,15 @@ server/
   sql.js             dialect-aware SQL building (quoting, parameters, WHERE / ORDER BY checks) and script splitting
   drivers/           one class per database; base.js holds the shared row operations
 src/                 Vue 3 UI (components/, tiny hash router, store, API client)
+  ddl.js             CREATE / ALTER TABLE statements for the structure form
 scripts/bundle.mjs   esbuild step that embeds the built UI into dist/dbeditor.mjs
 test/                node:test suites
 ```
 
 Adding a database means adding a driver in `server/drivers/` that implements the methods listed at the top of
-`server/drivers/base.js`, plus a dialect entry in `server/sql.js` if its quoting or parameters differ.
+`server/drivers/base.js`, plus a dialect entry in `server/sql.js` if its quoting or parameters differ. For the
+structure form, add its supported changes and common types to `FEATURES` and `TYPES` in `src/ddl.js`, and its
+ALTER TABLE syntax to `alterTableSql`.
 
 ## Security
 
@@ -72,11 +116,16 @@ This tool can read and change everything the database user can, so:
 - Identifiers from the UI are checked against the table's real columns and quoted; values are always bound
   parameters. The browse view's `WHERE` / `ORDER BY` text is SQL you type, checked to be a single clause
   (no `;`, comments or unbalanced quotes and parentheses). The SQL tab runs whatever you type, as it should.
+- The structure form quotes table and column names. Types and defaults are SQL you type, used as written,
+  and the whole script is shown before it runs.
 
 ## Limitations
 
 - Rows can only be edited or deleted in tables with a primary key; otherwise use the SQL tab.
 - Binary values are shown as hex and can't be edited inline.
-- No table/column creation forms yet: use the SQL tab for DDL.
+- The structure form covers columns and the primary key. Indexes, foreign keys and column order are changed
+  from the SQL tab, as are SQLite column changes other than rename, add and drop.
+- Renaming a MySQL column without changing anything else uses `RENAME COLUMN`, which needs MySQL 8.0 or
+  MariaDB 10.5.2 or newer.
 - The MySQL and PostgreSQL drivers are covered by SQL-generation tests but have not yet been run against
   live servers; SQLite is tested end to end.

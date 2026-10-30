@@ -10,18 +10,21 @@ export const dialects = {
 		quote: (id) => '`' + String(id).replaceAll('`', '``') + '`',
 		param: () => '?',
 		emptyInsert: ' () VALUES ()',
+		transactionalDdl: false, // every CREATE / ALTER commits on its own
 	},
 	postgres: {
 		name: 'postgres',
 		quote: (id) => '"' + String(id).replaceAll('"', '""') + '"',
 		param: (i) => '$' + i,
 		emptyInsert: ' DEFAULT VALUES',
+		transactionalDdl: true,
 	},
 	sqlite: {
 		name: 'sqlite',
 		quote: (id) => '"' + String(id).replaceAll('"', '""') + '"',
 		param: () => '?',
 		emptyInsert: ' DEFAULT VALUES',
+		transactionalDdl: true,
 	},
 };
 
