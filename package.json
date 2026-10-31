@@ -10,8 +10,11 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/bundle.mjs",
+    "build": "vite build && node scripts/bundle.mjs && electron-builder",
+    "build:cli": "vite build && node scripts/bundle.mjs --cli",
+    "build:desktop": "vite build && node scripts/bundle.mjs --desktop && electron-builder",
     "start": "node dist/dbeditor.mjs",
+    "desktop": "vite build && node scripts/bundle.mjs --desktop && electron dist/desktop",
     "test": "node --test --disable-warning=ExperimentalWarning \"test/*.test.js\""
   },
   "dependencies": {
@@ -21,6 +24,8 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-vue": "^6.0.10",
+    "electron": "44.8.0",
+    "electron-builder": "26.17.0",
     "esbuild": "^0.28.2",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.5",

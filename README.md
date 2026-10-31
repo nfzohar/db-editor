@@ -21,9 +21,13 @@ It supports **MySQL/MariaDB**, **PostgreSQL** and **SQLite**, and builds to a si
 
 ## Use it
 
+There are two builds of the same editor: a single file run with Node.js, and a desktop app (below).
+
 ```sh
 yarn install
-yarn build             # -> dist/dbeditor.mjs (one self-contained file)
+yarn build:cli         # -> dist/dbeditor.mjs (one self-contained file)
+yarn build:desktop     # -> the desktop app in release/ (see Desktop app)
+yarn build             # both: the two bundles are built in parallel, then the desktop app is packaged
 yarn start             # same as: node dist/dbeditor.mjs  -> http://127.0.0.1:8080/
 ```
 
@@ -36,6 +40,24 @@ file anywhere with Node 22.13+ and run it. Options:
 --allow-sqlite     allow SQLite when listening on a non-local address
 -h, --help         show these options
 ```
+
+## Desktop app
+
+The same editor also runs as a desktop app (Electron), packaged as one executable file:
+
+```sh
+yarn desktop               # build and open it from this checkout, without packaging
+yarn build:desktop         # -> release/dbeditor-<version>-x86_64.AppImage on Linux
+yarn build:desktop --win   # -> release/dbeditor-<version>-x64.exe, a portable .exe (also builds on Linux)
+```
+
+macOS builds (`--mac`, a `.dmg`) have to be made on a Mac. The files are not code-signed, so Windows
+SmartScreen and macOS Gatekeeper warn before the first start.
+
+The app starts the server inside itself on `127.0.0.1` and shows the UI in its own window. Only that window
+can use the server: its requests carry a key made at each start, and anything else gets `403`. SQLite is
+always available. The port is kept between runs (in `settings.json` in the app's data folder, e.g.
+`~/.config/DB Editor/` on Linux) so that saved connections, query history and the theme are kept too.
 
 ## Using the UI
 
@@ -92,7 +114,9 @@ server/
   drivers/           one class per database; base.js holds the shared row operations
 src/                 Vue 3 UI (components/, tiny hash router, store, API client)
   ddl.js             CREATE / ALTER TABLE statements for the structure form
-scripts/bundle.mjs   esbuild step that embeds the built UI into dist/dbeditor.mjs
+scripts/bundle.mjs   esbuild step that embeds the built UI into dist/dbeditor.mjs and dist/desktop/ (--cli / --desktop for one)
+desktop/main.js      Electron entry: starts the server and opens the window; icon.svg is the source of icon.png
+electron-builder.yml packaging of the desktop app
 test/                node:test suites
 ```
 

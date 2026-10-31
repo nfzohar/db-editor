@@ -1,0 +1,21 @@
+# Packages the desktop app (see desktop/main.js) as one executable file per platform:
+# an AppImage on Linux, a portable .exe on Windows and a .dmg on macOS.
+appId: dbeditor.desktop
+productName: DB Editor
+artifactName: dbeditor-${version}-${arch}.${ext}
+directories:
+  app: dist/desktop # built by scripts/bundle.mjs
+  output: release
+files:
+  - '!node_modules{,/**/*}' # the drivers are in the bundle already
+publish: null # no auto-update server
+icon: desktop/icon.png
+npmRebuild: false
+linux:
+  target: AppImage
+  category: Development
+win:
+  target: portable
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
