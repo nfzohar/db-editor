@@ -42,6 +42,8 @@ function writeDesktopApp() {
 	copyFileSync(path('desktop/icon.png'), path('dist/desktop/icon.png'));
 	writeFileSync(path('dist/desktop/package.json'), JSON.stringify({
 		name: pkg.name, productName: 'DB Editor', version: pkg.version, description: pkg.description, main: 'main.mjs',
+		// Linux window id (WM_CLASS / Wayland app_id), so docks match the window to its dbeditor.desktop launcher.
+		desktopName: 'dbeditor.desktop',
 	}, null, '\t') + '\n');
 }
 
