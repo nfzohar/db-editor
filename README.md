@@ -1,7 +1,8 @@
 # DB Editor
 
 A small web-based database editor in the spirit of phpMyAdmin and Adminer, written in JavaScript.
-It supports **MySQL/MariaDB**, **PostgreSQL** and **SQLite**, and builds to a single file you run with Node.js.
+It supports **MySQL/MariaDB**, **PostgreSQL** and **SQLite**, and comes in two builds of the same editor:
+a single file you run with Node.js and open in a browser, and a desktop app for Linux, Windows and macOS.
 
 - Browse tables PhpStorm-style: type SQL into the `WHERE` and `ORDER BY` bar above the grid, or click a header to sort
 - Edit cells inline with editors that fit the column type (dropdowns for boolean/enum, date and time pickers, checks for numbers, JSON, UUIDs and length) and mark rows for deletion, then Apply or Revert the changes together (tables with a primary key); the table SQL tab generates SELECT / INSERT / UPDATE / DELETE templates
@@ -11,13 +12,15 @@ It supports **MySQL/MariaDB**, **PostgreSQL** and **SQLite**, and builds to a si
 - phpMyAdmin-style layout: database tree on the left, breadcrumb bar, Tables / SQL / Create table tabs on a
   database and Browse / Structure / SQL tabs on a table
 - Light and dark themes: follows the system setting, or pick one with the theme button in the top bar
-- The login page lists previous connections (kept in the browser, without passwords) to fill the form in one click
+- The login page lists previous connections (kept in the browser, without passwords) to fill the form in one click,
+  and imports connection URLs such as a cloud console's `postgres://…` service URI
 
 ## Requirements
 
 - Node.js **22.13 or newer** (SQLite uses the built-in `node:sqlite` module). With nvm: `nvm use` picks up `.nvmrc`.
+  The packaged desktop app brings its own and needs nothing installed.
 - Yarn 4, through Corepack (bundled with Node 22): run `corepack enable` once. The exact Yarn version is pinned
-  in `package.json` (`packageManager`), so everyone gets the same one.
+  in `package.json` (`packageManager`), so everyone gets the same one. Only needed to build.
 
 ## Use it
 
@@ -25,8 +28,8 @@ There are two builds of the same editor: a single file run with Node.js, and a d
 
 ```sh
 yarn install
-yarn build:cli         # -> dist/dbeditor.mjs (one self-contained file)
-yarn build:desktop     # -> the desktop app for Linux, Windows and macOS in release/ (see Desktop app)
+yarn build:cli         # -> dist/dbeditor.mjs (one self-contained file, a few seconds)
+yarn build:desktop     # -> the desktop app for Linux, Windows and macOS in release/ (a few minutes)
 yarn build             # both: the two bundles are built in parallel, then the desktop app is packaged
 yarn start             # same as: node dist/dbeditor.mjs  -> http://127.0.0.1:8080/
 ```
@@ -47,8 +50,11 @@ The same editor also runs as a desktop app (Electron), packaged as one file per 
 
 ```sh
 yarn desktop          # build and open it from this checkout, without packaging
-yarn build:desktop    # package it for all platforms (a few minutes), into release/:
+yarn build:desktop    # package it for all platforms (a few minutes) into release/
 ```
+
+When packaging is done, `release/` holds just these files; electron-builder's unpacked builds and logs stay in
+`dist/electron/`. A rebuild replaces files of the same name; delete packages of older versions yourself.
 
 | File | Platform | How to start it |
 |---|---|---|
@@ -59,11 +65,31 @@ yarn build:desktop    # package it for all platforms (a few minutes), into relea
 
 All of them build on Linux, including the macOS ones. To package for one platform only, run `yarn build:desktop`
 once and then `yarn electron-builder --linux` (or `--win`, `--mac`). On a Mac, `yarn electron-builder --mac dmg`
-makes a `.dmg` instead of the `.zip`.
+makes a `.dmg` instead of the `.zip`. The packages keep only Electron's English language files, as the UI is in
+English, and use normal compression: maximum compression would save a fifth of the size but makes the AppImage
+take about 40 seconds to start, as it decompresses on every start.
 
 None of the files are code-signed, so Windows SmartScreen asks for confirmation at the first start ("More
 info", "Run anyway"), and macOS blocks the app when it was downloaded (it may say the app "is damaged"):
 after moving it to Applications, run `xattr -cr "/Applications/DB Editor.app"` once.
+
+To list the AppImage in the Linux application menu, keep it in a fixed place and add a launcher. The name
+`dbeditor.desktop` and `StartupWMClass=dbeditor` let the dock match the open window to it:
+
+```sh
+mkdir -p ~/Applications ~/.local/share/icons
+cp release/dbeditor-*-linux-x86_64.AppImage ~/Applications/dbeditor.AppImage
+cp desktop/icon.png ~/.local/share/icons/dbeditor.png
+cat > ~/.local/share/applications/dbeditor.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=DB Editor
+Exec=$HOME/Applications/dbeditor.AppImage
+Icon=$HOME/.local/share/icons/dbeditor.png
+StartupWMClass=dbeditor
+Categories=Development;
+EOF
+```
 
 The app starts the server inside itself on `127.0.0.1` and shows the UI in its own window. Only that window
 can use the server: its requests carry a key made at each start, and anything else gets `403`. SQLite is
@@ -117,24 +143,30 @@ sessions also end after 60 minutes idle.
 
 ```sh
 yarn dev      # Vite dev server with hot reload on http://127.0.0.1:5173/; the API runs inside it
-yarn test     # SQL generation for all dialects (queries, structure form, templates) + HTTP API against SQLite
+yarn test     # SQL generation for all dialects (queries, structure form, templates), connection URL parsing
+              # and the HTTP API against SQLite
 ```
 
 ## Layout
 
 ```
 server/
-  main.js            CLI entry: parses options, starts the HTTP server
-  app.js             HTTP routing, sessions, CSRF checks, security headers
-  sql.js             dialect-aware SQL building (quoting, parameters, WHERE / ORDER BY checks) and script splitting
-  drivers/           one class per database; base.js holds the shared row operations
-src/                 Vue 3 UI (components/, tiny hash router, store, API client)
-  ddl.js             CREATE / ALTER TABLE statements for the structure form
-scripts/bundle.mjs   esbuild step that embeds the built UI into dist/dbeditor.mjs and dist/desktop/ (--cli / --desktop for one)
-desktop/main.js      Electron entry: starts the server and opens the window; icon.svg is the source of icon.png
-electron-builder.yml packaging of the desktop app (work folder dist/electron/)
-scripts/collect-release.mjs  moves the finished packages to release/, so it holds nothing else
-test/                node:test suites
+  main.js               CLI entry: parses options, starts the HTTP server
+  app.js                HTTP routing, sessions, CSRF checks, security headers
+  sql.js                dialect-aware SQL building (quoting, parameters, WHERE / ORDER BY checks), script splitting
+  drivers/              one class per database; base.js holds the shared row operations
+src/                    Vue 3 UI (components/, tiny hash router, store, API client)
+  ddl.js                CREATE / ALTER TABLE statements for the structure form
+  connectionUri.js      reads connection URLs for Import from URL on the login page
+desktop/
+  main.js               Electron entry: starts the server and opens the window
+  icon.svg, icon.png    app icon (the PNG is rendered from the SVG)
+scripts/
+  bundle.mjs            esbuild step that embeds the built UI into dist/dbeditor.mjs and dist/desktop/
+                        (--cli / --desktop for just one)
+  collect-release.mjs   electron-builder hook: moves the finished packages to release/
+electron-builder.yml    packaging of the desktop app (work folder dist/electron/)
+test/                   node:test suites
 ```
 
 Adding a database means adding a driver in `server/drivers/` that implements the methods listed at the top of
@@ -159,6 +191,10 @@ This tool can read and change everything the database user can, so:
   (no `;`, comments or unbalanced quotes and parentheses). The SQL tab runs whatever you type, as it should.
 - The structure form quotes table and column names. Types and defaults are SQL you type, used as written,
   and the whole script is shown before it runs.
+- Import from URL reads the URL in the browser and clears it when its dialog closes; the password in it is
+  not stored, like any other password.
+- The desktop app's server also listens on `127.0.0.1` only, and answers only its own window, whose requests
+  carry a key made at each start.
 
 ## Limitations
 
@@ -170,3 +206,5 @@ This tool can read and change everything the database user can, so:
   MariaDB 10.5.2 or newer.
 - The MySQL and PostgreSQL drivers are covered by SQL-generation tests but have not yet been run against
   live servers; SQLite is tested end to end.
+- The desktop packages are not code-signed. The Linux one is tested; the Windows and macOS ones are built and
+  checked for content but have not yet been run on those systems.
