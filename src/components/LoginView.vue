@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, reactive, ref } from 'vue';
 import { api } from '../api.js';
+import { parseConnectionUri } from '../connectionUri.js';
 import { formatAgo } from '../format.js';
 import { resetData, store } from '../store.js';
 import AppLogo from './AppLogo.vue';
@@ -43,6 +44,7 @@ const error = ref('');
 const busy = ref(false);
 const showPassword = ref(false);
 const passwordInput = ref(null);
+const userInput = ref(null);
 const submitButton = ref(null);
 
 const driver = computed(() => store.drivers.find((d) => d.id === form.driver));
@@ -70,7 +72,39 @@ function use(connection) {
 	const { lastUsed, ...fields } = connection;
 	Object.assign(form, blank, fields);
 	error.value = '';
+	importWarning.value = '';
 	nextTick(() => (passwordInput.value ?? submitButton.value)?.focus());
+}
+
+// "Import from URL", as in Beekeeper Studio: a dialog that fills in the form from a connection URL. The URL
+// holds the password in plain text, so it is cleared whenever the dialog closes.
+const importDialog = ref(null);
+const importUrl = ref('');
+const importError = ref('');
+const importWarning = ref('');
+
+function openImport() {
+	importUrl.value = '';
+	importError.value = '';
+	importDialog.value.showModal();
+}
+
+function importFromUrl() {
+	let fields;
+	try {
+		fields = parseConnectionUri(importUrl.value);
+	} catch (e) {
+		importError.value = e.message;
+		return;
+	}
+	const { masked, ...values } = fields;
+	Object.assign(form, blank, values);
+	importDialog.value.close();
+	error.value = '';
+	importWarning.value = masked
+		? 'The URL has a hidden-password placeholder instead of the user and password: enter them below, or import the URL again with the password revealed.'
+		: '';
+	nextTick(() => (masked ? userInput.value : (form.password || form.driver === 'sqlite' ? submitButton.value : passwordInput.value))?.focus());
 }
 
 function title(c) {
@@ -106,9 +140,14 @@ async function submit() {
 			<form @submit.prevent="submit">
 				<div class="mb-5 flex justify-center"><AppLogo class="text-2xl" /></div>
 				<div class="overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-md">
-					<div class="panel-title">Log in</div>
+					<div class="panel-title flex items-center justify-between">
+						Log in
+						<button type="button" class="cursor-pointer font-medium tracking-normal text-brand normal-case hover:underline" @click="openImport">Import from URL</button>
+					</div>
 					<div class="space-y-3 p-5">
 						<p v-if="error" class="rounded border border-red-300 bg-red-50 px-3 py-2 text-red-800" role="alert">{{ error }}</p>
+
+						<p v-if="importWarning" class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900" role="status">{{ importWarning }}</p>
 
 						<label class="grid grid-cols-[7rem_1fr] items-center gap-3">
 							<span class="text-neutral-600">System</span>
@@ -129,7 +168,7 @@ async function submit() {
 							</div>
 							<label class="grid grid-cols-[7rem_1fr] items-center gap-3">
 								<span class="text-neutral-600">Username</span>
-								<input v-model="form.user" class="input" autocomplete="username" autocapitalize="off" spellcheck="false" autofocus>
+								<input ref="userInput" v-model="form.user" class="input" autocomplete="username" autocapitalize="off" spellcheck="false" autofocus>
 							</label>
 							<div class="grid grid-cols-[7rem_1fr] items-center gap-3">
 								<label for="password" class="text-neutral-600">Password</label>
@@ -174,6 +213,37 @@ async function submit() {
 					</div>
 				</div>
 			</form>
+
+			<dialog
+				ref="importDialog"
+				class="m-auto w-[calc(100%-2rem)] max-w-lg overflow-hidden rounded-lg border border-neutral-300 bg-white p-0 text-sm text-neutral-800 shadow-xl backdrop:bg-black/40"
+				aria-labelledby="import-title"
+				@close="importUrl = ''"
+			>
+				<form @submit.prevent="importFromUrl">
+					<div id="import-title" class="panel-title">Import from URL</div>
+					<div class="space-y-2 p-5">
+						<label for="import-url" class="block text-neutral-600">Paste a connection URL to fill in the login form.</label>
+						<input
+							id="import-url"
+							v-model="importUrl"
+							class="input w-full font-mono text-xs"
+							placeholder="postgres://user:password@host:5432/db?sslmode=require"
+							autocomplete="off"
+							autocapitalize="off"
+							spellcheck="false"
+							autofocus
+							@input="importError = ''"
+						>
+						<p v-if="importError" class="text-xs text-red-700" role="alert">{{ importError }}</p>
+						<p class="text-xs text-neutral-500">postgres://, postgresql://, mysql://, mariadb:// or sqlite:///path/to/file.db</p>
+					</div>
+					<div class="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+						<button type="button" class="btn" @click="importDialog.close()">Cancel</button>
+						<button class="btn btn-primary" :disabled="!importUrl.trim()">Import</button>
+					</div>
+				</form>
+			</dialog>
 
 			<section v-if="connections.length" class="mt-6 overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-sm" aria-labelledby="previous-connections">
 				<div id="previous-connections" class="panel-title">Previous connections</div>

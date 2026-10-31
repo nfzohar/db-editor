@@ -26,7 +26,7 @@ There are two builds of the same editor: a single file run with Node.js, and a d
 ```sh
 yarn install
 yarn build:cli         # -> dist/dbeditor.mjs (one self-contained file)
-yarn build:desktop     # -> the desktop app in release/ (see Desktop app)
+yarn build:desktop     # -> the desktop app for Linux, Windows and macOS in release/ (see Desktop app)
 yarn build             # both: the two bundles are built in parallel, then the desktop app is packaged
 yarn start             # same as: node dist/dbeditor.mjs  -> http://127.0.0.1:8080/
 ```
@@ -43,16 +43,27 @@ file anywhere with Node 22.13+ and run it. Options:
 
 ## Desktop app
 
-The same editor also runs as a desktop app (Electron), packaged as one executable file:
+The same editor also runs as a desktop app (Electron), packaged as one file per platform:
 
 ```sh
-yarn desktop               # build and open it from this checkout, without packaging
-yarn build:desktop         # -> release/dbeditor-<version>-x86_64.AppImage on Linux
-yarn build:desktop --win   # -> release/dbeditor-<version>-x64.exe, a portable .exe (also builds on Linux)
+yarn desktop          # build and open it from this checkout, without packaging
+yarn build:desktop    # package it for all platforms (a few minutes), into release/:
 ```
 
-macOS builds (`--mac`, a `.dmg`) have to be made on a Mac. The files are not code-signed, so Windows
-SmartScreen and macOS Gatekeeper warn before the first start.
+| File | Platform | How to start it |
+|---|---|---|
+| `dbeditor-<version>-linux-x86_64.AppImage` | Linux x64 | run the file (it is executable) |
+| `dbeditor-<version>-win-x64.exe` | Windows x64 | run the file; nothing is installed |
+| `dbeditor-<version>-mac-arm64.zip` | macOS, Apple Silicon | unzip, move `DB Editor.app` to Applications |
+| `dbeditor-<version>-mac-x64.zip` | macOS, Intel | the same |
+
+All of them build on Linux, including the macOS ones. To package for one platform only, run `yarn build:desktop`
+once and then `yarn electron-builder --linux` (or `--win`, `--mac`). On a Mac, `yarn electron-builder --mac dmg`
+makes a `.dmg` instead of the `.zip`.
+
+None of the files are code-signed, so Windows SmartScreen asks for confirmation at the first start ("More
+info", "Run anyway"), and macOS blocks the app when it was downloaded (it may say the app "is damaged"):
+after moving it to Applications, run `xattr -cr "/Applications/DB Editor.app"` once.
 
 The app starts the server inside itself on `127.0.0.1` and shows the UI in its own window. Only that window
 can use the server: its requests carry a key made at each start, and anything else gets `403`. SQLite is
@@ -65,6 +76,11 @@ always available. The port is kept between runs (in `settings.json` in the app's
    server, port, username and password; the database is optional (PostgreSQL defaults to `postgres`). For
    SQLite, enter the path to the database file on the machine running the server. Earlier connections are
    listed under the form: click one to fill it in again (you still type the password).
+   - Or press **Import from URL** above the form and paste a connection URL, such as a cloud console's
+     service URI, to fill in the whole form: `postgres://user:password@host:5432/db?sslmode=require`,
+     `mysql://…?ssl-mode=REQUIRED`, `mariadb://…` or `sqlite:///path/to/file.db`. If the console hides the
+     password in the URL (Aiven shows `CLICK_TO:REVEAL_PASSWORD`), everything else is filled in and you enter
+     the user and password.
 2. **Find a table.** The left sidebar lists the databases; expand one to see its tables and their columns.
    The filter box above it matches table and column names. ↻ reloads the list after you change the schema.
    Clicking a database opens its table list with row counts and links to each table.
@@ -116,7 +132,8 @@ src/                 Vue 3 UI (components/, tiny hash router, store, API client)
   ddl.js             CREATE / ALTER TABLE statements for the structure form
 scripts/bundle.mjs   esbuild step that embeds the built UI into dist/dbeditor.mjs and dist/desktop/ (--cli / --desktop for one)
 desktop/main.js      Electron entry: starts the server and opens the window; icon.svg is the source of icon.png
-electron-builder.yml packaging of the desktop app
+electron-builder.yml packaging of the desktop app (work folder dist/electron/)
+scripts/collect-release.mjs  moves the finished packages to release/, so it holds nothing else
 test/                node:test suites
 ```
 

@@ -10,9 +10,9 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/bundle.mjs && electron-builder",
+    "build": "vite build && node scripts/bundle.mjs && electron-builder --linux --win --mac",
     "build:cli": "vite build && node scripts/bundle.mjs --cli",
-    "build:desktop": "vite build && node scripts/bundle.mjs --desktop && electron-builder",
+    "build:desktop": "vite build && node scripts/bundle.mjs --desktop && electron-builder --linux --win --mac",
     "start": "node dist/dbeditor.mjs",
     "desktop": "vite build && node scripts/bundle.mjs --desktop && electron dist/desktop",
     "test": "node --test --disable-warning=ExperimentalWarning \"test/*.test.js\""

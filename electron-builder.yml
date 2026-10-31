@@ -1,15 +1,18 @@
-# Packages the desktop app (see desktop/main.js) as one executable file per platform:
-# an AppImage on Linux, a portable .exe on Windows and a .dmg on macOS.
+# Packages the desktop app (see desktop/main.js) as one file per platform and architecture:
+# an AppImage on Linux, a portable .exe on Windows and a .zip with the .app on macOS (Intel and Apple Silicon).
+# All three build on Linux; a .dmg (`--mac dmg`) and code signing need a Mac.
 appId: dbeditor.desktop
 productName: DB Editor
-artifactName: dbeditor-${version}-${arch}.${ext}
+artifactName: dbeditor-${version}-${os}-${arch}.${ext}
 directories:
   app: dist/desktop # built by scripts/bundle.mjs
-  output: release
+  output: dist/electron # work folder; the finished packages are moved to release/ by:
+afterAllArtifactBuild: scripts/collect-release.mjs
 files:
   - '!node_modules{,/**/*}' # the drivers are in the bundle already
 publish: null # no auto-update server
 icon: desktop/icon.png
+electronLanguages: [en-US] # the UI is English; this leaves out Electron's other 54 languages
 npmRebuild: false
 linux:
   target: AppImage
@@ -18,5 +21,7 @@ linux:
 win:
   target: portable
 mac:
-  target: dmg
+  target:
+    - target: zip
+      arch: [x64, arm64]
   category: public.app-category.developer-tools
