@@ -264,12 +264,13 @@ async function applyChanges() {
 	}
 }
 
+defineExpose({ discardChanges });
 </script>
 
 <template>
-	<div class="overflow-hidden rounded-md border border-neutral-300 bg-white">
+	<div class="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-neutral-300 bg-white">
 		<!-- Toolbar: paging and page size; selection, pending changes and reload on the right -->
-		<div class="flex flex-wrap items-center gap-1 border-b border-neutral-300 bg-neutral-50 px-2 py-1">
+		<div class="flex shrink-0 flex-wrap items-center gap-1 border-b border-neutral-300 bg-neutral-50 px-2 py-1">
 			<button class="btn btn-sm" title="First page" aria-label="First page" :disabled="state.page === 0 || loading" @click="goTo(0)">«</button>
 			<button class="btn btn-sm" title="Previous page" aria-label="Previous page" :disabled="state.page === 0 || loading" @click="goTo(state.page - 1)">‹</button>
 			<span class="min-w-24 px-1 text-center text-xs text-neutral-600 tabular-nums">
@@ -298,7 +299,7 @@ async function applyChanges() {
 		</div>
 
 		<!-- Clause bar: free SQL for the WHERE and ORDER BY of the query, applied with Enter -->
-		<form class="flex flex-wrap gap-px border-b border-neutral-300 bg-neutral-300 font-mono text-xs" @submit.prevent="runQuery">
+		<form class="flex shrink-0 flex-wrap gap-px border-b border-neutral-300 bg-neutral-300 font-mono text-xs" @submit.prevent="runQuery">
 			<label class="flex min-w-0 flex-[2_1_16rem] items-center gap-3 bg-white px-4 focus-within:bg-brand-light">
 				<span class="font-semibold text-brand">WHERE</span>
 				<input v-model="state.where" class="min-w-0 flex-1 bg-transparent py-2.5 focus:outline-none" :placeholder="`e.g. ${firstColumn} > 10`" autocapitalize="off" spellcheck="false">
@@ -310,15 +311,15 @@ async function applyChanges() {
 			<button class="sr-only">Apply</button>
 		</form>
 
-		<p v-if="error" class="border-b border-red-300 bg-red-50 px-3 py-1.5 text-red-800" role="alert">{{ error }}</p>
-		<p v-if="cellError" class="border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-amber-900" role="alert">{{ cellError }}</p>
-		<p v-if="result && keyColumns.length === 0" class="border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-amber-900">
+		<p v-if="error" class="shrink-0 border-b border-red-300 bg-red-50 px-3 py-1.5 text-red-800" role="alert">{{ error }}</p>
+		<p v-if="cellError" class="shrink-0 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-amber-900" role="alert">{{ cellError }}</p>
+		<p v-if="result && keyColumns.length === 0" class="shrink-0 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-amber-900">
 			There is no primary key here, so rows are read-only in this view. Use the SQL tab to change them.
 		</p>
 
 		<template v-if="result">
 			<!-- Data -->
-			<div class="max-h-[65vh] overflow-auto">
+			<div class="min-h-0 flex-1 overflow-auto">
 				<table class="data-table compact">
 					<thead>
 						<tr>
@@ -399,7 +400,7 @@ async function applyChanges() {
 			</div>
 
 			<!-- Status bar: the query that produced these rows -->
-			<div class="flex items-center gap-3 border-t border-neutral-300 bg-neutral-50 px-2 py-1 text-xs text-neutral-500">
+			<div class="flex shrink-0 items-center gap-3 border-t border-neutral-300 bg-neutral-50 px-2 py-1 text-xs text-neutral-500">
 				<code class="min-w-0 flex-1 truncate font-mono" :title="result.sql">{{ result.sql }}</code>
 				<span class="whitespace-nowrap tabular-nums">{{ formatSeconds(result.time) }}</span>
 			</div>

@@ -6,7 +6,8 @@ import { formatAgo } from '../format.js';
 import { resetData, store } from '../store.js';
 import AppLogo from './AppLogo.vue';
 
-// Connections that logged in successfully, newest first, kept per browser. Passwords are never stored.
+// Connections that logged in successfully, newest first, kept per browser. Passwords are only
+// stored when "Remember password" was checked at login time.
 const CONNECTIONS_KEY = 'dbeditor.connections';
 const OLD_LOGIN_KEY = 'dbeditor.login'; // the single remembered form from before this list existed
 const MAX_CONNECTIONS = 10;
@@ -21,10 +22,11 @@ function readJson(key) {
 }
 
 /** Just the fields that matter for the connection's system, plus when it was last used. */
-function toConnection(source, lastUsed = Date.now()) {
+function toConnection(source, lastUsed = Date.now(), includePassword = false) {
 	const server = store.drivers.find((d) => d.id === source.driver)?.server ?? source.driver !== 'sqlite';
 	const fields = server ? SERVER_FIELDS : ['file'];
-	return { driver: source.driver, ...Object.fromEntries(fields.map((f) => [f, source[f] ?? ''])), lastUsed };
+	const password = server && includePassword && source.password ? { password: source.password } : {};
+	return { driver: source.driver, ...Object.fromEntries(fields.map((f) => [f, source[f] ?? ''])), ...password, lastUsed };
 }
 
 // The same server, user and database (or the same file) is one entry, whatever its SSL setting.
@@ -43,6 +45,7 @@ const form = reactive({ ...blank }); // starts empty; pick a previous connection
 const error = ref('');
 const busy = ref(false);
 const showPassword = ref(false);
+const rememberPassword = ref(false);
 const passwordInput = ref(null);
 const userInput = ref(null);
 const submitButton = ref(null);
@@ -59,7 +62,7 @@ function saveConnections(list) {
 }
 
 function remember() {
-	const entry = toConnection(form);
+	const entry = toConnection(form, Date.now(), rememberPassword.value);
 	saveConnections([entry, ...connections.value.filter((c) => identity(c) !== identity(entry))].slice(0, MAX_CONNECTIONS));
 }
 
@@ -71,6 +74,7 @@ function forget(connection) {
 function use(connection) {
 	const { lastUsed, ...fields } = connection;
 	Object.assign(form, blank, fields);
+	rememberPassword.value = Boolean(connection.password);
 	error.value = '';
 	importWarning.value = '';
 	nextTick(() => (passwordInput.value ?? submitButton.value)?.focus());
@@ -209,6 +213,10 @@ async function submit() {
 						</label>
 					</div>
 					<div class="flex items-center justify-end gap-3 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+						<label v-if="driver?.server !== false" class="flex items-center gap-1.5 text-xs text-neutral-600">
+							<input v-model="rememberPassword" type="checkbox">
+							Remember password
+						</label>
 						<button ref="submitButton" class="btn btn-primary" :disabled="busy">{{ busy ? 'Connecting…' : 'Log in' }}</button>
 					</div>
 				</div>
@@ -261,7 +269,7 @@ async function submit() {
 						<button type="button" class="cursor-pointer px-4 text-neutral-400 hover:text-red-700" :title="'Forget ' + title(c)" :aria-label="'Forget ' + title(c)" @click="forget(c)">✕</button>
 					</li>
 				</ul>
-				<p class="border-t border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-500">Saved in this browser without passwords.</p>
+				<p class="border-t border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-500">Saved in this browser. Passwords are only saved if "Remember password" was checked at login.</p>
 			</section>
 		</div>
 	</div>

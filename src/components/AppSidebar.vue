@@ -1,14 +1,49 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
+import { api } from '../api.js';
 import { displayName } from '../format.js';
 import { link, route } from '../router.js';
-import { columnsKey, loadColumns, loadDatabases, loadTables, notify, store } from '../store.js';
+import { columnsKey, loadColumns, loadDatabases, loadTables, notify, resetData, store } from '../store.js';
+import { setSidebarWidth, sidebarWidth } from '../sidebarWidth.js';
+import { cycleTheme, theme } from '../theme.js';
 import AppLogo from './AppLogo.vue';
 import TableIcon from './TableIcon.vue';
 
 const expanded = ref(new Set());
 const filter = ref('');
 const showSystem = ref(false);
+
+/** Drag the right edge to resize; pointer capture keeps the drag going past the handle's bounds. */
+function startResize(event) {
+	event.preventDefault();
+	const startX = event.clientX;
+	const startWidth = sidebarWidth.value;
+	const handle = event.currentTarget;
+	handle.setPointerCapture(event.pointerId);
+	document.body.style.cursor = 'col-resize';
+	document.body.style.userSelect = 'none';
+
+	function onMove(e) {
+		setSidebarWidth(startWidth + (e.clientX - startX));
+	}
+	function onUp() {
+		handle.removeEventListener('pointermove', onMove);
+		handle.removeEventListener('pointerup', onUp);
+		document.body.style.cursor = '';
+		document.body.style.userSelect = '';
+	}
+	handle.addEventListener('pointermove', onMove);
+	handle.addEventListener('pointerup', onUp, { once: true });
+}
+
+const driverLabel = () => store.drivers.find((d) => d.id === store.session.driver)?.label ?? store.session.driver;
+
+async function logout() {
+	await api('logout', {}).catch(() => {});
+	resetData();
+	store.session = null;
+	location.hash = '#/';
+}
 
 onMounted(async () => {
 	try {
@@ -79,13 +114,32 @@ function isActive(db, table) {
 <template>
 	<div v-if="store.sidebarOpen" class="fixed inset-0 z-30 bg-black/30 lg:hidden" @click="store.sidebarOpen = false" />
 	<aside
-		class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-neutral-300 bg-neutral-100 transition-transform lg:translate-x-0"
+		class="fixed inset-y-0 left-0 z-40 flex flex-col border-r border-neutral-300 bg-neutral-100 transition-transform lg:translate-x-0"
 		:class="store.sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+		:style="{ width: sidebarWidth + 'px' }"
 		@click="(e) => e.target.closest('a') && (store.sidebarOpen = false)"
 	>
+		<div
+			class="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize touch-none hover:bg-brand/30 active:bg-brand/50"
+			role="separator"
+			aria-label="Resize sidebar"
+			aria-orientation="vertical"
+			@pointerdown="startResize"
+		/>
 		<div class="border-b border-neutral-300 bg-linear-to-b from-white to-neutral-100 px-4 py-3">
-			<a :href="link()" class="text-lg hover:no-underline"><AppLogo /></a>
-			<div class="mt-0.5 truncate text-xs text-neutral-500" :title="store.session.version">{{ store.session.version }}</div>
+			<div class="flex items-center justify-between gap-2">
+				<a :href="link()" class="min-w-0 truncate text-lg hover:no-underline"><AppLogo /></a>
+				<div class="flex shrink-0 items-center gap-1">
+					<button class="rounded px-1.5 py-1 text-neutral-500 hover:bg-white hover:text-brand" :title="`Theme: ${theme.label} (click to change)`" :aria-label="`Theme: ${theme.label}`" @click="cycleTheme">{{ theme.icon }}</button>
+					<button class="rounded px-1.5 py-1 text-neutral-500 hover:bg-white hover:text-brand" title="Log out" aria-label="Log out" @click="logout">⏻</button>
+				</div>
+			</div>
+			<div class="mt-1.5 truncate text-xs text-neutral-500">
+				<a :href="link()" class="hover:text-brand hover:underline" :title="store.session.version">{{ driverLabel() }}: {{ store.session.label }}</a>
+			</div>
+			<div v-if="route.db" class="truncate text-xs text-neutral-400">
+				<a :href="link({ db: route.db })" class="hover:text-brand hover:underline">{{ route.db }}</a>
+			</div>
 		</div>
 
 		<div class="flex gap-1 border-b border-neutral-300 px-2 py-2">
