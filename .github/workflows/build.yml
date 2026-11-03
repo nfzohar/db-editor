@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: # adds a "Run workflow" button on the Actions tab
 
 jobs:
   build:
@@ -19,7 +20,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24" # package.json needs >=22.13
           cache: "yarn"
 
       - name: Install dependencies
@@ -27,3 +28,14 @@ jobs:
 
       - name: Run build
         run: yarn build
+
+      # The packages end up in release/ (see scripts/collect-release.mjs). GitHub serves an
+      # uploaded artifact as a single .zip, downloadable from the workflow run's summary page.
+      - name: Upload application packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbeditor-build-${{ github.run_number }}
+          path: release/
+          if-no-files-found: error
+          compression-level: 0 # the packages are already compressed
+          retention-days: 30
