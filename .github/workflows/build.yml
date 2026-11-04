@@ -1,41 +1,48 @@
-name: Yarn Build
+name: Build and publish latest release
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch: # adds a "Run workflow" button on the Actions tab
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    # Has wine preinstalled, needed to package the Windows build from Linux.
+    container: electronuserland/builder:wine
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "24" # package.json needs >=22.13
-          cache: "yarn"
+          node-version-file: .nvmrc
+
+      - name: Enable corepack
+        run: corepack enable
 
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Run build
+      - name: Build
         run: yarn build
 
-      # The packages end up in release/ (see scripts/collect-release.mjs). GitHub serves an
-      # uploaded artifact as a single .zip, downloadable from the workflow run's summary page.
-      - name: Upload application packages
-        uses: actions/upload-artifact@v4
+      - name: Strip version from asset names
+        run: |
+          mkdir -p release-latest
+          for f in release/*; do
+            newname=$(basename "$f" | sed -E 's/^dbeditor-[0-9]+\.[0-9]+\.[0-9]+-/dbeditor-/')
+            cp "$f" "release-latest/$newname"
+          done
+          cp dist/dbeditor.mjs release-latest/dbeditor.mjs
+
+      - name: Publish release
+        uses: ncipollo/release-action@v1
         with:
-          name: dbeditor-build-${{ github.run_number }}
-          path: release/
-          if-no-files-found: error
-          compression-level: 0 # the packages are already compressed
-          retention-days: 30
+          tag: ci-${{ github.run_number }}
+          name: "Build ${{ github.run_number }} (${{ github.sha }})"
+          commit: ${{ github.sha }}
+          makeLatest: true
+          artifacts: release-latest/*
